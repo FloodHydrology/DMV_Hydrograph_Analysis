@@ -19,7 +19,7 @@ library(dygraphs)
 library(devtools)
 devtools::install_github("khondula/rodm2")
 library(RSQLite)
-library(NBI)
+library(DBI)
 library(rodm2)
 #Data wrangling
 library(lubridate)
