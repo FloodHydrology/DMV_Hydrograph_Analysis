@@ -1,2 +1,2 @@
-# DMV_Hydrograph_Analysis
-Examine wetland hydrographs associated with Delarmarva Carbon project
+# DMV Hydrograph Analysis
+The goal of this repository is to examine wetland hydrographs associated with the Palmer Lab Delarmarva Bay Carbon project. 
