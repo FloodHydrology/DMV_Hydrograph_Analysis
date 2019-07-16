@@ -131,6 +131,3 @@ SWL<-SWL %>%
 
 #plot
 dygraph_ts_fun(SWL)
-
-
-
