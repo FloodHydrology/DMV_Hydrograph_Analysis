@@ -13,15 +13,17 @@ rm(list=ls(all=TRUE))
 
 #Defind relevant working directories
 data_dir<-"C://choptank/"
+output_dir<-"C://choptank/output/"
 
 #Load relevant packages
+library('scales')
 library('readxl')
 library('lubridate')
 library('segmented')
 library('tidyverse')
 
 #download data
-df<-read_xlsx(paste0(data_dir, 'Choptank_Wetlands_WY2019.xlsx'), sheet = 'SWL',  na='NA')
+df<-read_xlsx(paste0(data_dir, 'Choptank_Wetlands_WY2019.xlsx'), sheet = 'SWL',  na='NA', col_types = c('date', rep('numeric',17)))
 
 #Clean up data a bit
 df<-df %>% 
@@ -37,12 +39,7 @@ df<-df %>%
 #Missing Data (Chase down later)
 #BB Spring 2018
 df<-df %>% select(-'BB')
-#mising all data
-df<-df %>% select(-'DV')
-df<-df %>% select(-'GB')
-df<-df %>% select(-'JU')
-df<-df %>% select(-'QB')
-#There appears to be an issue with correction to JA
+#JB A has a werid off set in recession plot
 df<-df %>% select(-'JA')
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -51,11 +48,18 @@ df<-df %>% select(-'JA')
 #2.1 Create function------------------------------------------------------------
 fun<-function(n){
   
+  #A. Setup workspace~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #Isolate time series
   ts<-df[,c(1,n)] 
   colnames(ts)<-c("time", "waterLevel")
   
-  #Recession Analysis~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #Remove NA
+  ts<-na.omit(ts)
+  
+  #Aquire wetland name
+  WetID <- names(df[,n])
+  
+  #B. Recession Analysis~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #Isolate recession dayes
   temp<-ts %>% mutate(dwL = waterLevel - lag(waterLevel)) %>% filter(dwL<0) %>% filter(waterLevel>0)
   
@@ -65,17 +69,50 @@ fun<-function(n){
   
   #Estimate spill threshold
   wL_spill<-segmented_mod$psi[2]
-  
+
   #Esitmate recession rate
   recession_rate<-segmented_mod$coefficients[2]
   
+  #Export recession plot
+  png(paste0(output_dir,'recession/',WetID,".png"), width=6.5, height=4, units = 'in', res=300)
+    par(mar=c(5, 5, 4, 2) + 0.1)
+    plot(segmented_mod, lty=2, lwd=2, col="red", rug=F, 
+         #Y Limits
+         ylim=c(-0.05,0),
+         #Labels
+         title = WetID, xlab = "Water Level [m]", ylab= 'Recession Rate\n[m/day]',
+         #Label Size
+         ps=12, cex.lab=14/12, cex.axis=10/12
+         )
+         
+    points(temp$waterLevel, temp$dwL, pch=19, col=alpha("grey30", 0.3))
+    mtext(paste0(WetID, ' Wetland'), side = 3, line= 1, cex = 2)
+  dev.off()  
+  
   #Create some rules to make sure segmented reggression makes sense
   if((segmented_mod$coefficients[2]+segmented_mod$coefficients[3])>0){
+    
+    #Update coefficients
     wL_spill<-max(temp$waterLevel)
     recession_rate<-lin_mod$coefficients[2]
-  }
+    
+    #Export new recession plot
+    png(paste0(output_dir,'recession/',WetID,".png"), width=6.5, height=4, units = 'in', res=300)
+      par(mar=c(5, 5, 4, 2) + 0.1)
+      plot(temp$waterLevel, temp$dwL, pch=19, col="grey30", 
+           #Y Limits
+           ylim=c(-0.05,0),
+           #Labels
+           title = WetID, xlab = "Water Level [m]", ylab= 'Recession Rate\n[m/day]',
+           #Label Size
+           ps=12, cex.lab=14/12, cex.axis=10/12
+      )
+      abline(lin_mod, lty=2, lwd=2, col="red")
+      mtext(paste0(WetID, ' Wetland'), side = 3, line= 1, cex = 2)
+    dev.off()  
+   }
   
-  #Estimate water level metrics~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #C. Estimate water level metrics~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #Characterize water level
   wL_max<-max(ts$waterLevel, na.rm=T)
   wL_mean<-mean(ts$waterLevel, na.rm=T)
@@ -84,12 +121,75 @@ fun<-function(n){
   wL_var_norm<-wL_var/wL_spill
   
   #Characterize duration of different components
-  dur_inun<-ts %>% filter(waterLevel>(0.05*wL_spill)) %>% count() %>% pull()
-  dur_conn<-ts %>% filter(waterLevel>wL_spill) %>% count() %>% pull()
+  inun_dur<-ts %>% filter(waterLevel>(0.05*wL_spill)) %>% count() %>% pull()
   
-  #Create output tibble~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #D. Chracterize Connectivity~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #Isolate individual events
+  con<-tibble(
+    start  = ts %>% filter(lag(waterLevel)<wL_spill & waterLevel>=wL_spill) %>% select(time) %>% pull, 
+    stop   = ts %>% filter(lag(waterLevel)>wL_spill & waterLevel<=wL_spill | time == max(time) & waterLevel>wL_spill) %>% select(time) %>% pull,
+    top    = ts %>% select(waterLevel) %>% summarise(max(waterLevel)) %>% pull,
+    bottom = ts %>% select(waterLevel) %>% summarise(min(waterLevel)) %>% pull
+  )
+  
+  #Total duration of connectivity 
+  con_dur<-ts %>% filter(waterLevel>wL_spill) %>% count() %>% pull()
+  
+  #Frequency of Connectivity
+  con_n_events<-nrow(con)
+  
+  #Duration of typical event
+  con_mean_dur<- con %>% mutate(dif = as.numeric(paste(stop - start))) %>% select(dif) %>% summarise(mean(dif)) %>% pull()
+  
+  #E. Chracterize disconnectivity~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  dis<-tibble(
+    start  = ts %>% filter(lag(waterLevel)>0 & waterLevel<=0 | time == min(time) & waterLevel<0) %>% select(time) %>% pull, 
+    stop   = ts %>% filter(lag(waterLevel)<0 & waterLevel>=0) %>% select(time) %>% pull,
+    top    = ts %>% select(waterLevel) %>% summarise(max(waterLevel)) %>% pull,
+    bottom = ts %>% select(waterLevel) %>% summarise(min(waterLevel)) %>% pull
+  )
+  
+  #Total duration of disnectivity 
+  dis_dur<-ts %>% filter(waterLevel>wL_spill) %>% count() %>% pull()
+  
+  #Frequency of disnectivity
+  dis_n_events<-nrow(dis)
+  
+  #Duration of typical event
+  dis_mean_dur<- dis %>% mutate(dif = as.numeric(paste(stop - start))) %>% select(dif) %>% summarise(mean(dif)) %>% pull()
+  
+  #F. Plot~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #start plotting device
+  png(paste0(output_dir,'time_series/',WetID,".png"), width=6.5, height=4, units = 'in', res=300)
+  
+  #Start GGPlot Device
+  p<-ggplot() +
+    #Add line thresholds
+    geom_hline(yintercept = wL_spill, col="steelblue4", lty=2)+
+    geom_hline(yintercept = 0, col="tan4", lty=2)+
+    #Add Period od Connectivity
+    geom_rect(data = con,
+              aes(xmin=start, xmax=stop, ymax=top, ymin=bottom),
+              fill="steelblue4", alpha=0.6)+
+    #Add Period od Disconnectivity
+    geom_rect(data = dis,
+              aes(xmin=start, xmax=stop, ymax=top, ymin=bottom),
+              fill="tan4", alpha=0.6)+
+    #Add line
+    geom_path(data = ts, aes(time, waterLevel)) + 
+    #Add BW Theme
+    theme_bw() +
+      #Add Labels
+      labs(title = paste(WetID, "Wetland"), x = 'Date', y= "Water Level [m]")
+  
+  print(p)
+  
+  #Turn plotting device off
+  dev.off()
+  
+  #G. Export output tibble~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   output<-tibble(
-    WetID = names(df[,n]),
+    WetID,
     wL_spill,
     recession_rate,
     wL_max,
@@ -97,14 +197,18 @@ fun<-function(n){
     wL_mean_norm,
     wL_var,
     wL_var_norm,
-    dur_inun = dur_inun,
-    dur_conn = dur_conn
+    inun_dur,
+    con_dur, 
+    con_n_events, 
+    con_mean_dur, 
+    dis_dur, 
+    dis_n_events, 
+    dis_mean_dur
   )
   
   #Export output
   output
 }
 
-
-#Apply function to time series data---------------------------------------------
+#2.2 Apply function to time series data---------------------------------------------
 output<-lapply(seq(2,ncol(df)), fun) %>% bind_rows()
