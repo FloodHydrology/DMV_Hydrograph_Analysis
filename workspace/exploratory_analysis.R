@@ -43,7 +43,7 @@ df<-df %>% select(-'BB')
 df<-df %>% select(-'JA')
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#2.0 Exame annual metrics-------------------------------------------------------
+#2.0 Characterize hydrologic regime---------------------------------------------
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #2.1 Create function------------------------------------------------------------
 fun<-function(n){
@@ -210,5 +210,53 @@ fun<-function(n){
   output
 }
 
-#2.2 Apply function to time series data---------------------------------------------
-output<-lapply(seq(2,ncol(df)), fun) %>% bind_rows()
+#2.2 Apply function to time series data-----------------------------------------
+regime<-lapply(seq(2,ncol(df)), fun) %>% bind_rows()
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#3.0 Examine spatial and temporal distributions---------------------------------
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#3.1 Hydrologic Regime----------------------------------------------------------
+#A. Create Plot~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+r<-regime %>%
+  #Change Row Headings for chart titles
+  rename(
+    '1. Water Level: Spill [m]' = wL_spill, 
+    '1. Water Level: Recession [m/day]' = recession_rate,
+    '1. Water Level: Max [m]' = wL_max,
+    '1. Water Level: Mean [m]' = wL_mean,
+    '1. Water Level: Mean [m/m]' = wL_mean_norm,
+    '1. Water Level: Variance' = wL_var,
+    '1. Water Level: Variance [norm]' = wL_var_norm,
+    '2. Duration: Inundation [days]'= inun_dur,
+    '2. Duration: Connectivity [days]' = con_dur,
+    '3. Frequency: Spill Events' = con_n_events,
+    '4. Period: Spill Event [days]' = con_mean_dur,
+    '2. Duration: Dry [days]' = dis_dur,
+    '3. Frequency: Dry Events' = dis_n_events,
+    '4. Period: Dry Event [days]' =dis_mean_dur
+  ) %>% 
+  #Pivot to long format
+  pivot_longer(-WetID, 
+               names_to='metric', 
+               values_to='val') %>% 
+  #Start ggplot object
+  ggplot(aes(val)) +
+    #Facet object
+    facet_wrap(.~metric, scales='free') +
+    #add density plot
+    geom_density(fill='steelblue4', alpha=0.6) + 
+    #add black/white them
+    theme_bw()
+
+#Print Plot~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#start plotting device
+png(paste0(output_dir,'distributions/hydro_regime.png'), width=13, height=7, units = 'in', res=300)
+print(r)
+dev.off()
+
+
+
+
+
+
