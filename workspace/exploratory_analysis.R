@@ -21,8 +21,10 @@ library('readxl')
 library('lubridate')
 library('segmented')
 library('tidyverse')
+library('vegan')
 
 #download data
+geo<-read_csv(paste0(data_dir, "spatial_data.csv"))
 df<-read_xlsx(paste0(data_dir, 'Choptank_Wetlands_WY2019.xlsx'), sheet = 'SWL',  na='NA', col_types = c('date', rep('numeric',17)))
 
 #Clean up data a bit
@@ -69,24 +71,24 @@ fun<-function(n){
   
   #Estimate spill threshold
   wL_spill<-segmented_mod$psi[2]
-
+  
   #Esitmate recession rate
   recession_rate<-segmented_mod$coefficients[2]
   
   #Export recession plot
   png(paste0(output_dir,'recession/',WetID,".png"), width=6.5, height=4, units = 'in', res=300)
-    par(mar=c(5, 5, 4, 2) + 0.1)
-    plot(segmented_mod, lty=2, lwd=2, col="red", rug=F, 
-         #Y Limits
-         ylim=c(-0.05,0),
-         #Labels
-         title = WetID, xlab = "Water Level [m]", ylab= 'Recession Rate\n[m/day]',
-         #Label Size
-         ps=12, cex.lab=14/12, cex.axis=10/12
-         )
-         
-    points(temp$waterLevel, temp$dwL, pch=19, col=alpha("grey30", 0.3))
-    mtext(paste0(WetID, ' Wetland'), side = 3, line= 1, cex = 2)
+  par(mar=c(5, 5, 4, 2) + 0.1)
+  plot(segmented_mod, lty=2, lwd=2, col="red", rug=F, 
+       #Y Limits
+       ylim=c(-0.05,0),
+       #Labels
+       title = WetID, xlab = "Water Level [m]", ylab= 'Recession Rate\n[m/day]',
+       #Label Size
+       ps=12, cex.lab=14/12, cex.axis=10/12
+  )
+  
+  points(temp$waterLevel, temp$dwL, pch=19, col=alpha("grey30", 0.3))
+  mtext(paste0(WetID, ' Wetland'), side = 3, line= 1, cex = 2)
   dev.off()  
   
   #Create some rules to make sure segmented reggression makes sense
@@ -98,19 +100,19 @@ fun<-function(n){
     
     #Export new recession plot
     png(paste0(output_dir,'recession/',WetID,".png"), width=6.5, height=4, units = 'in', res=300)
-      par(mar=c(5, 5, 4, 2) + 0.1)
-      plot(temp$waterLevel, temp$dwL, pch=19, col="grey30", 
-           #Y Limits
-           ylim=c(-0.05,0),
-           #Labels
-           title = WetID, xlab = "Water Level [m]", ylab= 'Recession Rate\n[m/day]',
-           #Label Size
-           ps=12, cex.lab=14/12, cex.axis=10/12
-      )
-      abline(lin_mod, lty=2, lwd=2, col="red")
-      mtext(paste0(WetID, ' Wetland'), side = 3, line= 1, cex = 2)
+    par(mar=c(5, 5, 4, 2) + 0.1)
+    plot(temp$waterLevel, temp$dwL, pch=19, col="grey30", 
+         #Y Limits
+         ylim=c(-0.05,0),
+         #Labels
+         title = WetID, xlab = "Water Level [m]", ylab= 'Recession Rate\n[m/day]',
+         #Label Size
+         ps=12, cex.lab=14/12, cex.axis=10/12
+    )
+    abline(lin_mod, lty=2, lwd=2, col="red")
+    mtext(paste0(WetID, ' Wetland'), side = 3, line= 1, cex = 2)
     dev.off()  
-   }
+  }
   
   #C. Estimate water level metrics~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   #Characterize water level
@@ -150,7 +152,7 @@ fun<-function(n){
   )
   
   #Total duration of disnectivity 
-  dis_dur<-ts %>% filter(waterLevel>wL_spill) %>% count() %>% pull()
+  dis_dur<-ts %>% filter(waterLevel<0) %>% count() %>% pull()
   
   #Frequency of disnectivity
   dis_n_events<-nrow(dis)
@@ -179,8 +181,8 @@ fun<-function(n){
     geom_path(data = ts, aes(time, waterLevel)) + 
     #Add BW Theme
     theme_bw() +
-      #Add Labels
-      labs(title = paste(WetID, "Wetland"), x = 'Date', y= "Water Level [m]")
+    #Add Labels
+    labs(title = paste(WetID, "Wetland"), x = 'Date', y= "Water Level [m]")
   
   print(p)
   
@@ -211,14 +213,14 @@ fun<-function(n){
 }
 
 #2.2 Apply function to time series data-----------------------------------------
-regime<-lapply(seq(2,ncol(df)), fun) %>% bind_rows()
+hydro<-lapply(seq(2,ncol(df)), fun) %>% bind_rows()
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #3.0 Examine spatial and temporal distributions---------------------------------
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #3.1 Hydrologic Regime----------------------------------------------------------
 #A. Create Plot~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-r<-regime %>%
+h<-hydro %>%
   #Change Row Headings for chart titles
   rename(
     '1. Water Level: Spill [m]' = wL_spill, 
@@ -242,21 +244,146 @@ r<-regime %>%
                values_to='val') %>% 
   #Start ggplot object
   ggplot(aes(val)) +
-    #Facet object
-    facet_wrap(.~metric, scales='free') +
-    #add density plot
-    geom_density(fill='steelblue4', alpha=0.6) + 
-    #add black/white them
-    theme_bw()
+  #Facet object
+  facet_wrap(.~metric, scales='free') +
+  #add density plot
+  geom_density(fill='steelblue4', alpha=0.6) + 
+  #add black/white them
+  theme_bw()
+
+#print
+h
 
 #Print Plot~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #start plotting device
 png(paste0(output_dir,'distributions/hydro_regime.png'), width=13, height=7, units = 'in', res=300)
-print(r)
+print(h)
 dev.off()
 
+#3.2 Hydrogeomorphic Data-------------------------------------------------------
+#A. Create Plot~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+g<-geo %>%
+  #Pivot to long format
+  pivot_longer(-Wetland, 
+               names_to='metric', 
+               values_to='val') %>% 
+  #Start ggplot object
+  ggplot(aes(val)) +
+  #Facet object
+  facet_wrap(.~metric, scales='free') +
+  #add density plot
+  geom_density(fill='dark orange', alpha=0.6) + 
+  #add black/white them
+  theme_bw()
 
+#print
+g
 
+#Print Plot~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#start plotting device
+png(paste0(output_dir,'distributions/hydrogeomorphic_characteristics.png'), width=13, height=7, units = 'in', res=300)
+print(g)
+dev.off()
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#4.0 NMDS Analysis--------------------------------------------------------------
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#4.1 NMDS Analysis--------------------------------------------------------------
+#Create matrix for NMDS
+x<-hydro %>% 
+  #Filter FN out (for now)
+  filter(WetID!="FN") %>% 
+  #Convert WetID to RowName
+  column_to_rownames('WetID') %>% 
+  #Take care of NA
+  mutate(dis_mean_dur = if_else(is.na(dis_mean_dur),0,dis_mean_dur))
 
+#Scale variable
+x_scaled<-scale(x)
 
+#Create NMDS Model
+set.seed(7)
+n<-1000
+mds.1 <-metaMDS(x_scaled,distance = "euclidean", k=1, trymax = n)
+mds.2 <-metaMDS(x_scaled,distance = "euclidean", k=2, trymax = n)
+mds.3 <-metaMDS(x_scaled,distance = "euclidean", k=3, trymax = n)
+mds.4 <-metaMDS(x_scaled,distance = "euclidean", k=4, trymax = n)
+mds.5 <-metaMDS(x_scaled,distance = "euclidean", k=5, trymax = n)
+mds.6 <-metaMDS(x_scaled,distance = "euclidean", k=6, trymax = n)
+
+#4.2 Analysis of fit------------------------------------------------------------
+#Scree Plot
+stress<-c(mds.1$stress, mds.2$stress, mds.3$stress, mds.4$stress, mds.5$stress, mds.6$stress)
+plot(stress,
+     ylim = c(0,0.27),
+     xlab="Number of Axes",
+     type = "o",
+     ylab="Stress",
+     cex.lab=1.6,
+     lty = 2,
+     lwd = 3,
+     pch=21,
+     col= "black",
+     bg= "red",
+     cex = 3,
+     bty="l")
+box(lwd=2, 
+    bty = "l")
+
+#Shephards Plot
+par(mfrow=c(1,2))
+stressplot(mds.3,
+           main = "Shepard Plot")
+gof = goodness(mds.3)
+plot(mds.3, 
+     type = "p",
+     main = "Goodness of Fit",
+     cex = gof*200)
+par(mfrow=c(1,1))
+
+#After visual investigation, a 3-axes model is most appropriate~~~~~~~~~~~~~~~~~
+
+#4.3 Environmental Vector Analysis----------------------------------------------
+#4.3.A Hydro Variables----------------------------------------------------------
+#Fit environmnetal vectors
+ef3<-envfit(mds.3, x, permu=n, choices = c(1,2))
+
+#Create function for plotting
+site.plot<-function(mds.x,mds.y,X.Label, Y.Label){
+  plot(mds.x,mds.y, 
+       #Point Options
+       pch=21,bg= "gray",lwd = 2, cex=2.5,
+       #Axes Labels
+       xlab = X.Label, ylab = Y.Label,
+       #Axes Options
+       bty = "L", ps=12, cex.axis=10/12, cex.lab=14/12
+  )
+  #text(mds.x,mds.y, labels = rownames(x))
+  plot(ef3, add = TRUE, cex = 1.3, col = "black")     
+}
+
+#Plot
+#start plotting device
+png(paste0(output_dir,'ordination/nmds_hydro.png'), width=6.5, height=6, units = 'in', res=300)
+site.plot(mds.3$points[,1],mds.3$points[,2], "NMDS1 (Hydro Variability)", "NMDS2 (Inundation Duration)")
+dev.off()
+
+#4.3.B Geomorph Variables-------------------------------------------------------
+#Create fit matrix
+y<-geo %>% column_to_rownames('Wetland') %>% filter(geo$Wetland %in% hydro$WetID )
+
+#Select the most relevant variables
+y<-y %>% select(wetland_invert, watershed_hsc_cm, mean_elevation_m, hans_m)
+
+#Fit environmnetal vectors
+ef3<-envfit(mds.3, y, permu=10000, choices = c(1,2,3))
+
+#Plot
+png(paste0(output_dir,'ordination/nmds_geo.png'), width=6.5, height=6, units = 'in', res=300)
+site.plot(mds.3$points[,1],mds.3$points[,2], "NMDS1 (Hydro Variability)", "NMDS2 (Inundation Duration)")
+dev.off()
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#Export Hydro Metrics~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+write_csv(hydro, paste0(data_dir,"output/hydro_metrics.csv"))
