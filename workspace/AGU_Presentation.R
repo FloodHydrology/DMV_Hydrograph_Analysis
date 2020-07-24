@@ -275,26 +275,105 @@ ggsave(paste0(output_dir,"agu_conn_dur.png"), width=3.5, height=3, units="in")
 #6.0 Hydrogeomorphic Analysis---------------------------------------------------
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #6.1 Wetland Size---------------------------------------------------------------
-plot(df$area_m2, df$wL_mean, log="xy")
+#Mean Water Level
 lm(log10(df$area_m2)~log10(df$wL_mean)) %>% summary()
+df %>% 
+  mutate(wL_mean = wL_mean*100) %>% 
+  ggplot(aes(area_m2, wL_mean))+
+    geom_point(shape=21, fill = 'steelblue', size=3)+
+    scale_x_continuous(trans='log10') +
+    scale_y_continuous(trans='log10') +
+    geom_smooth(method = "lm", linetype=2, lwd=1, col="black", se=F) +
+      theme_bw()+
+      labs(x = "Wetland Area [m^2]", y = "Mean Water Level [cm]") +
+      theme(axis.text=element_text(size=14), 
+            axis.title=element_text(size=18))
+ggsave(paste0(output_dir,"agu_WetArea_wL.png"), width=3.75, height=3.5, units="in")
 
-plot(df$area_m2, df$wL_var, log="xy")
-lm(log(df$area_m2)~log(df$wL_var)) %>% summary()
+#WAter Level Variance
+lm(log10(df$area_m2)~log10(df$wL_var)) %>% summary()
+df %>% 
+  mutate(wL_mean = wL_var*100) %>% 
+  ggplot(aes(area_m2, wL_var))+
+  geom_point(shape=21, fill = 'forestgreen', size=3)+
+  scale_x_continuous(trans='log10') +
+  scale_y_continuous(trans='log10') +
+  geom_smooth(method = "lm", linetype=2, lwd=1, col="black", se=F) +
+  theme_bw()+
+  labs(x = "Wetland Area [m^2]", y = "Water Level Variance [cm]") +
+  theme(axis.text=element_text(size=14), 
+        axis.title=element_text(size=18))
+ggsave(paste0(output_dir,"agu_WetArea_wL_var.png"), width=3.75, height=3.5, units="in")
 
-plot(df$area_m2, df$inun_dur, log="xy")
-lm(log(df$area_m2)~(df$inun_dur)) %>% summary()
+#Inundation Duration
+lm(log10(df$area_m2)~log10(df$inun_dur)) %>% summary()
+df %>% 
+   ggplot(aes(area_m2, inun_dur))+
+  geom_point(shape=21, fill = 'darkgoldenrod3', size=3)+
+  scale_x_continuous(trans='log10') +
+  #scale_y_continuous(trans='log10') +
+  geom_smooth(method = "lm", linetype=2, lwd=1, col="black", se=F) +
+  theme_bw()+
+  labs(x = "Wetland Area [m^2]", y = "Inundation Duration [Days]") +
+  theme(axis.text=element_text(size=14), 
+        axis.title=element_text(size=18))
+ggsave(paste0(output_dir,"agu_WetArea_inun.png"), width=3.75, height=3.5, units="in")
 
-#6.2 Storage Capacity-----------------------------------------------------------
-plot(df$wetland_hsc_cm, df$recession_rate, log="xy")
-lm(log10(df$wetland_hsc_cm)~log10(df$recession_rate)) %>% summary()
-
-plot(df$watershed_hsc_cm, df$recession_rate, log="xy")
+#6.2 Watershed Storage Capacity-------------------------------------------------
 lm(log10(df$watershed_hsc_cm)~log10(df$recession_rate)) %>% summary()
+df %>% 
+  ggplot(aes(watershed_hsc_cm, recession_rate))+
+  geom_point(shape=21, fill = 'darkblue', size=4)+
+  scale_x_continuous(trans='log10') +
+  #scale_y_continuous(trans='log10') +
+  geom_smooth(method = "lm", linetype=2, lwd=1, col="black", se=F) +
+  theme_bw()+
+  labs(x = "Watershed Storage Capacity [cm]", y = "Recession Rate [1/day]") +
+  theme(axis.text=element_text(size=14), 
+        axis.title=element_text(size=18))
+ggsave(paste0(output_dir,"agu_recssion_wsc.png"), width=5, height=4, units="in")
 
-#6.3 Storage Capacity-----------------------------------------------------------
-plot(df$mean_elevation_m,df$dis_n_events)
-lm((df$mean_elevation_m)~(df$dis_n_events)) %>% summary()
+#6.3 Elevation------------------------------------------------------------------
+#Dryin Events
+df %>% select(mean_elevation_m, dis_n_events) %>% 
+  ggplot() +
+    geom_segment(aes(x=0, y=mean_elevation_m, xend=dis_n_events, yend=mean_elevation_m), 
+                 lwd=0.75,lty=2, alpha=0.7) + 
+    geom_point(aes(x=dis_n_events, y=mean_elevation_m), 
+               shape=21, fill = 'steelblue', size=6, alpha=0.7) +
+    theme_bw()+
+      labs(y = "Wetland Elevation [m]", 
+           x = "Number of Drying Events") +
+      theme(axis.text=element_text(size=14), 
+            axis.title=element_text(size=18))
 
-plot(df$watershed_hsc_cm, df$recession_rate, log="xy")
-lm(log10(df$watershed_hsc_cm)~log10(df$recession_rate)) %>% summary()
+ggsave(paste0(output_dir,"agu_drying_elevation.png"), width=5, height=4, units="in")
+
+#Mean Water Level
+df %>% select(mean_elevation_m, wL_mean) %>% mutate(wL_mean = wL_mean*100) %>% 
+  ggplot() +
+  geom_segment(aes(x=20, y=mean_elevation_m, xend=wL_mean, yend=mean_elevation_m), 
+               lwd=0.75,lty=2, alpha=0.7) + 
+  geom_point(aes(x=wL_mean, y=mean_elevation_m), 
+             shape=21, fill = 'steelblue', size=6, alpha=0.7) +
+  theme_bw()+
+  labs(y = "Wetland Elevation [m]", 
+       x = "Mean Inundation Depth [cm]") +
+  theme(axis.text=element_text(size=14), 
+        axis.title=element_text(size=18))
+
+ggsave(paste0(output_dir,"agu_waterLevel_elevation.png"), width=5, height=4, units="in")
+
+#--------
+lm((df$mean_elevation_m)~(df$wL_mean)) %>% summary()
+df %>%  mutate(wL_mean = wL_mean*100) %>% 
+  ggplot(aes(mean_elevation_m, wL_mean))+
+  geom_point(shape=21, fill = 'darkblue', size=4, alpha=0.7)+
+  geom_smooth(method = "lm", linetype=2, lwd=1, col="black", se=F) +
+  theme_bw()+
+  labs(x = "Elevation [m]", 
+       y = "Mean Water Level [cm]") +
+  theme(axis.text=element_text(size=14), 
+        axis.title=element_text(size=18))
+ggsave(paste0(output_dir,"agu_elevation_mean_water_level.png"), width=5, height=4, units="in")
 
