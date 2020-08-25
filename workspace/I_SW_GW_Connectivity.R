@@ -86,7 +86,30 @@ df<-df %>%
          Timestamp <= mdy("9-30-2018"))
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#3.0 Examine Duration of SW-GW Connectivity Direction --------------------------
+#3.0 Plots of sw-gw connectivity ---------------------------------------------------
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+df %>% filter(wetland=="ND") %>% 
+  ggplot()+
+  geom_line(aes(x=Timestamp, y=sw),
+            col="dark blue", 
+            lwd = 1.5) +
+  geom_line(aes(x=Timestamp, y=up_1), 
+            col="#D95F02", 
+            lwd = 1) +
+  geom_line(aes(x=Timestamp, y=up_2), 
+            col="#E6AB02", 
+            lwd = 1) +
+  #Theme
+  theme_bw()+
+  ylab("Water Level [m]") +
+  xlab(NULL) +
+  #Axes Options
+  theme(
+    axis.title = element_text(size=14),
+    axis.text  = element_text(size = 10)) 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#4.0 Examine Duration of SW-GW Connectivity Direction --------------------------
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #Remove days without wetland water level
 df<-df %>% filter(!is.na(sw))
@@ -147,9 +170,9 @@ df %>%
   filter(n_wells>0)
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#4.0 Data vizulization ------------------------------ --------------------------
+#5.0 Data vizulization ---------------------------------------------------------
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#4.1 Stacked bar plot-----------------------------------------------------------
+#5.1 Stacked bar plot-----------------------------------------------------------
 #Tidy data
 bars<-df %>% 
   #Summarise by wetland
@@ -192,7 +215,7 @@ bars %>% ggplot() +
         legend.title = element_text(size=14), 
         legend.text = element_text(size=10)) 
 
-#4.2 Time Series Plot-----------------------------------------------------------
+#5.2 Time Series Plot-----------------------------------------------------------
 #Add color
 #Add proportion
 
@@ -242,7 +265,3 @@ ggplot(ts, aes(x=Timestamp, y=value, fill=name)) +
           legend.text = element_text(size=10)) 
     
     
-    
-
-
-#4.3 Elevation plot-------------------------------------------------------------
